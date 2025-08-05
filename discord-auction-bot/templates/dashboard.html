@@ -1,1 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auction Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1E1E1E;
+            --bg-tertiary: #2D2D2D;
+            --accent-primary: #BB86FC;
+            --accent-secondary: #3700B3;
+            --text-primary: #E0E0E0;
+            --text-secondary: #A0A0A0;
+            --success: #03DAC6;
+            --warning: #CF6679;
+            --danger: #B00020;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--bg-tertiary);
+        }
+        
+        .header-left h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header-left p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+        
+        .header-right {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+        }
+        
+        .search-bar input {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            margin-left: 0.5rem;
+            width: 250px;
+            outline: none;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn:hover {
+            background-color: var(--bg-tertiary);
+        }
+        
+        .btn-primary {
+            background-color: var(--accent-primary);
+            color: #121212;
+            border-color: var(--accent-primary);
+        }
+        
+        .btn-primary:hover {
+            background-color: #a368f0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-title {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-trend {
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+            gap: 0.25rem;
+        }
+        
+        .trend-up {
+            color: var(--success);
+        }
+        
+        .trend-down {
+            color: var(--danger);
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+        
+        .filter-btn.active {
+            background-color: var(--accent-secondary);
+            border-color: var(--accent-primary);
+        }
+        
+        .filter-btn:hover {
+            background-color: var(--bg-tertiary);
+        }
+        
+        .auction-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .auction-card {
+            background-color: var(--bg-secondary);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 1px solid var(--bg-tertiary);
+        }
+        
+        .auction-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            border-color: var(--accent-primary);
+        }
+        
+        .auction-media {
+            height: 180px;
+            background-color: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            position: relative;
+        }
+        
+        .auction-status {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .status-pending {
+            background-color: rgba(255, 165, 0, 0.15);
+            color: #FFA500;
+        }
+        
+        .status-active {
+            background-color: rgba(3, 218, 198, 0.15);
+            color: var(--success);
+        }
+        
+        .status-ended {
+            background-color: rgba(176, 0, 32, 0.15);
+            color: var(--danger);
+        }
+        
+        .auction-body {
+            padding: 1.5rem;
+        }
+        
+        .auction-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .auction-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1.25rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            min-height: 2.8em;
+        }
+        
+        .auction-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
+        }
+        
+        .auction-bids {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .bid-list {
+            margin-top: 1rem;
+            border-top: 1px solid var(--bg-tertiary);
+            padding-top: 1rem;
+        }
+        
+        .bid-list h4 {
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .bid-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--bg-tertiary);
+        }
+        
+        .bid-item:last-child {
+            border-bottom: none;
+        }
+        
+        .bid-user {
+            font-weight: 500;
+        }
+        
+        .bid-offer {
+            max-width: 60%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .auction-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+        }
+        
+        .action-btn {
+            flex: 1;
+            text-align: center;
+            padding: 0.5rem;
+            background-color: var(--bg-tertiary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .action-btn:hover {
+            background-color: var(--accent-secondary);
+            color: var(--accent-primary);
+        }
+        
+        .no-auctions {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+        
+        .no-auctions h3 {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+        
+        @media (max-width: 768px) {
+            .header-right {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .search-bar {
+                width: 100%;
+            }
+            
+            .search-bar input {
+                width: 100%;
+            }
+            
+            .auction-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <h1>Auction Dashboard</h1>
+                <p>Monitor and manage all auction activities</p>
+            </div>
+            <div class="header-right">
+                <div class="search-bar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" placeholder="Search auctions..." id="search-input">
+                </div>
+                <button class="btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    Settings
+                </button>
+            </div>
+        </header>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">Total Auctions</div>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+                <div class="stat-value" id="total-auctions">24</div>
+                <div class="stat-trend trend-up">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="19" x2="12" y2="5"></line>
+                        <polyline points="5 12 12 5 19 12"></polyline>
+                    </svg>
+                    <span>12% from last week</span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">Active Auctions</div>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
+                <div class="stat-value" id="active-auctions">8</div>
+                <div class="stat-trend trend-down">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <polyline points="19 12 12 19 5 12"></polyline>
+                    </svg>
+                    <span>3% from yesterday</span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">Pending Approval</div>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+                <div class="stat-value" id="pending-auctions">4</div>
+                <div class="stat-trend trend-up">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="19" x2="12" y2="5"></line>
+                        <polyline points="5 12 12 5 19 12"></polyline>
+                    </svg>
+                    <span>25% from last week</span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">Total Bids</div>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                </div>
+                <div class="stat-value" id="total-bids">142</div>
+                <div class="stat-trend trend-up">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="19" x2="12" y2="5"></line>
+                        <polyline points="5 12 12 5 19 12"></polyline>
+                    </svg>
+                    <span>18% from last week</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="filter-group">
+                <button class="filter-btn active">All Auctions</button>
+                <button class="filter-btn">Active</button>
+                <button class="filter-btn">Pending</button>
+                <button class="filter-btn">Completed</button>
+            </div>
+            
+            <button class="btn btn-primary" id="create-auction">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New Auction
+            </button>
+        </div>
+        
+        <div class="auction-grid" id="auction-container">
+            <!-- Auction cards will be inserted here by JavaScript -->
+        </div>
+    </div>
+    
+    <script>
+        // Sample auction data
+        const auctions = [
+            {
+                id: "au1",
+                title: "Vintage Rolex Submariner",
+                description: "1960s Rolex Submariner in excellent condition. Original parts, recently serviced.",
+                status: "active",
+                bids: [
+                    { user: "user4892", offer: "$12,500", time: "2 mins ago" },
+                    { user: "user6721", offer: "$12,200", time: "5 mins ago" },
+                    { user: "user1538", offer: "$12,000", time: "12 mins ago" }
+                ],
+                timeLeft: "2h 15m",
+                bidCount: 8,
+                createdAt: "2023-10-15"
+            },
+            {
+                id: "au2",
+                title: "Signed First Edition Harry Potter",
+                description: "First edition Philosopher's Stone signed by J.K. Rowling with certificate of authenticity.",
+                status: "active",
+                bids: [
+                    { user: "user9241", offer: "$8,750", time: "15 mins ago" },
+                    { user: "user3365", offer: "$8,500", time: "22 mins ago" }
+                ],
+                timeLeft: "5h 30m",
+                bidCount: 5,
+                createdAt: "2023-10-16"
+            },
+            {
+                id: "au3",
+                title: "Rare Pokémon Card Collection",
+                description: "Complete set of 1st edition holographic cards from 1999. Includes Charizard, Blastoise, and Venusaur.",
+                status: "pending",
+                bids: [],
+                timeLeft: "Not started",
+                bidCount: 0,
+                createdAt: "2023-10-17"
+            },
+            {
+                id: "au4",
+                title: "Limited Edition Star Wars Prop",
+                description: "Screen-used lightsaber from The Empire Strikes Back. Comes with authentication documents.",
+                status: "ended",
+                bids: [
+                    { user: "user7723", offer: "$45,000", time: "3 days ago" },
+                    { user: "user1589", offer: "$42,500", time: "3 days ago" },
+                    { user: "user6621", offer: "$40,000", time: "4 days ago" }
+                ],
+                timeLeft: "Ended",
+                bidCount: 12,
+                createdAt: "2023-10-10"
+            },
+            {
+                id: "au5",
+                title: "Antique Persian Rug",
+                description: "19th century Persian rug, 8x10 feet. Excellent condition with vibrant colors.",
+                status: "active",
+                bids: [
+                    { user: "user4892", offer: "$3,800", time: "1 hour ago" },
+                    { user: "user2241", offer: "$3,700", time: "2 hours ago" }
+                ],
+                timeLeft: "1d 4h",
+                bidCount: 6,
+                createdAt: "2023-10-14"
+            },
+            {
+                id: "au6",
+                title: "Original Picasso Sketch",
+                description: "Pencil sketch from 1952. Certificate of authenticity from Picasso estate.",
+                status: "pending",
+                bids: [],
+                timeLeft: "Not started",
+                bidCount: 0,
+                createdAt: "2023-10-18"
+            }
+        ];
 
+        // DOM elements
+        const auctionContainer = document.getElementById('auction-container');
+        const searchInput = document.getElementById('search-input');
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const createAuctionBtn = document.getElementById('create-auction');
+        
+        // Format status badge
+        function getStatusBadge(status) {
+            const statusMap = {
+                'pending': { class: 'status-pending', text: 'PENDING' },
+                'active': { class: 'status-active', text: 'ACTIVE' },
+                'ended': { class: 'status-ended', text: 'ENDED' }
+            };
+            
+            const statusInfo = statusMap[status] || { class: '', text: status.toUpperCase() };
+            return `<span class="auction-status ${statusInfo.class}">${statusInfo.text}</span>`;
+        }
+        
+        // Render auction cards
+        function renderAuctions(auctionsToRender) {
+            auctionContainer.innerHTML = '';
+            
+            if (auctionsToRender.length === 0) {
+                auctionContainer.innerHTML = `
+                    <div class="no-auctions">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <h3>No auctions found</h3>
+                        <p>Create your first auction or adjust your filters</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            auctionsToRender.forEach(auction => {
+                const bidsHTML = auction.bids.length > 0 
+                    ? auction.bids.slice(0, 3).map(bid => `
+                        <div class="bid-item">
+                            <span class="bid-user">${bid.user}</span>
+                            <span class="bid-offer">${bid.offer}</span>
+                            <span>${bid.time}</span>
+                        </div>
+                    `).join('')
+                    : '<p>No bids yet</p>';
+                
+                const auctionCard = `
+                    <div class="auction-card" data-status="${auction.status}">
+                        <div class="auction-media">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            ${getStatusBadge(auction.status)}
+                        </div>
+                        <div class="auction-body">
+                            <h3 class="auction-title">${auction.title}</h3>
+                            <p class="auction-description">${auction.description}</p>
+                            
+                            <div class="auction-meta">
+                                <div class="auction-time">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    ${auction.timeLeft}
+                                </div>
+                                <div class="auction-bids">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                    </svg>
+                                    ${auction.bidCount} bids
+                                </div>
+                            </div>
+                            
+                            <div class="bid-list">
+                                <h4>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                    </svg>
+                                    Recent Bids
+                                </h4>
+                                ${bidsHTML}
+                            </div>
+                            
+                            <div class="auction-actions">
+                                <div class="action-btn">View Details</div>
+                                <div class="action-btn">${auction.status === 'active' ? 'End Now' : 'Start Auction'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                auctionContainer.innerHTML += auctionCard;
+            });
+        }
+        
+        // Filter auctions
+        function filterAuctions() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const activeFilter = document.querySelector('.filter-btn.active').textContent;
+            
+            let filtered = auctions;
+            
+            // Apply search filter
+            if (searchTerm) {
+                filtered = filtered.filter(auction => 
+                    auction.title.toLowerCase().includes(searchTerm) || 
+                    auction.description.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // Apply status filter
+            if (activeFilter !== "All Auctions") {
+                const statusMap = {
+                    "Active": "active",
+                    "Pending": "pending",
+                    "Completed": "ended"
+                };
+                
+                const status = statusMap[activeFilter];
+                filtered = filtered.filter(auction => auction.status === status);
+            }
+            
+            renderAuctions(filtered);
+            
+            // Update stats
+            document.getElementById('total-auctions').textContent = auctions.length;
+            document.getElementById('active-auctions').textContent = auctions.filter(a => a.status === 'active').length;
+            document.getElementById('pending-auctions').textContent = auctions.filter(a => a.status === 'pending').length;
+            document.getElementById('total-bids').textContent = auctions.reduce((sum, auction) => sum + auction.bidCount, 0);
+        }
+        
+        // Event listeners
+        searchInput.addEventListener('input', filterAuctions);
+        
+        filterButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                filterAuctions();
+            });
+        });
+        
+        createAuctionBtn.addEventListener('click', () => {
+            alert('Auction creation would open in Discord');
+        });
+        
+        // Initial render
+        filterAuctions();
+    </script>
+</body>
+</html>

@@ -5,12 +5,22 @@ import asyncio
 from datetime import datetime, timedelta
 import os
 import json
+import sys
+import subprocess
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import uvicorn
 
-# Initialize FastAPI first
+# Ensure jinja2 is installed before importing templates
+try:
+    import jinja2
+except ImportError:
+    print("Installing missing jinja2...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "jinja2==3.1.3"])
+    import jinja2
+
+# Initialize FastAPI
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
@@ -85,7 +95,6 @@ class AuctionCreationModal(Modal, title='Create Auction'):
         }
         save_auctions(auctions_db)
         
-        # Fixed indentation
         await interaction.response.send_message(
             f"Auction ticket created: {channel.mention}",
             ephemeral=True
@@ -125,6 +134,7 @@ class AuctionView(View):
 @bot.command()
 @commands.has_role('Admin')
 async def setup(ctx):
+    """Setup auction creation button"""
     view = AuctionView()
     embed = discord.Embed(
         title="Auction System",
@@ -136,7 +146,9 @@ async def setup(ctx):
 @bot.command()
 @commands.has_role('Admin')
 async def start_auction(ctx, duration: str = "30m"):
+    """Admin command to start an auction"""
     try:
+        # Parse duration
         time_units = {'m': 60, 'h': 3600, 'd': 86400}
         unit = duration[-1]
         value = int(duration[:-1])
@@ -151,6 +163,7 @@ async def start_auction(ctx, duration: str = "30m"):
         auction["end_time"] = (datetime.now() + timedelta(seconds=seconds)).isoformat()
         save_auctions(auctions_db)
         
+        # Add bidders role permissions
         bidder_role = discord.utils.get(ctx.guild.roles, name=bidders_role)
         if bidder_role:
             await ctx.channel.set_permissions(
@@ -191,6 +204,7 @@ async def end_auction(channel):
     auction["status"] = "ended"
     save_auctions(auctions_db)
     
+    # Disable bidding
     bidder_role = discord.utils.get(channel.guild.roles, name=bidders_role)
     if bidder_role:
         await channel.set_permissions(
@@ -198,6 +212,7 @@ async def end_auction(channel):
             send_messages=False
         )
     
+    # Find winner
     winner = None
     if auction["bids"]:
         winner = auction["bids"][-1]
@@ -215,6 +230,7 @@ async def end_auction(channel):
             inline=False
         )
         
+        # Create private transaction channel
         creator = await bot.fetch_user(auction["creator"])
         overwrites = {
             channel.guild.default_role: discord.PermissionOverwrite(read_messages=False),
@@ -233,6 +249,7 @@ async def end_auction(channel):
             inline=False
         )
         
+        # Send message in transaction channel
         transaction_embed = discord.Embed(
             title=f"Transaction for: {auction['title']}",
             description=f"**Seller**: {creator.mention}\n**Buyer**: {winner_user.mention}",
@@ -255,17 +272,20 @@ async def end_auction(channel):
 @bot.command()
 @commands.has_role('Admin')
 async def extend(ctx, duration: str):
+    """Extend auction time"""
     try:
         auction = auctions_db.get(str(ctx.channel.id))
         if not auction or auction["status"] != "active":
             await ctx.send("❌ No active auction in this channel")
             return
             
+        # Parse duration
         time_units = {'m': 60, 'h': 3600, 'd': 86400}
         unit = duration[-1]
         value = int(duration[:-1])
         seconds = value * time_units[unit]
         
+        # Update end time
         end_time = datetime.fromisoformat(auction["end_time"]) + timedelta(seconds=seconds)
         auction["end_time"] = end_time.isoformat()
         save_auctions(auctions_db)
@@ -279,8 +299,10 @@ async def on_message(message):
     if message.author.bot:
         return
         
+    # Handle bids in auction channels
     channel_data = auctions_db.get(str(message.channel.id))
     if channel_data and channel_data["status"] == "active":
+        # Store bid
         bid = {
             "bidder": message.author.id,
             "offer": message.content,
@@ -296,6 +318,7 @@ async def on_message(message):
 
 @bot.event
 async def on_raw_reaction_add(payload):
+    # Handle emoji bids
     channel_data = auctions_db.get(str(payload.channel_id))
     if (channel_data and 
         channel_data["status"] == "active" and

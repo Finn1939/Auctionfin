@@ -1,1 +1,17 @@
-
+{
+  "build": {
+    "builder": "nixpacks",
+    "nixpacksConfigPath": "nixpacks.toml"
+  },
+  "deploy": {
+    "startCommand": "./start.sh",
+    "restartPolicyType": "always",
+    "restartPolicyMaxRetries": 10
+  },
+  "env": {
+    "PORT": {
+      "description": "Port for web server",
+      "value": "8000"
+    }
+  }
+}

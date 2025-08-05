@@ -12,6 +12,41 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 import uvicorn
 
+# Add to imports
+import os
+import pathlib
+# Template initialization
+try:
+    # Get absolute path to templates directory
+    templates_path = pathlib.Path(__file__).parent / "templates"
+    print(f"Looking for templates at: {templates_path}")
+    
+    # Verify templates directory exists
+    if not templates_path.exists():
+        os.makedirs(templates_path, exist_ok=True)
+        print(f"Created templates directory at: {templates_path}")
+    
+    # Verify dashboard.html exists
+    dashboard_path = templates_path / "dashboard.html"
+    if not dashboard_path.exists():
+        with open(dashboard_path, "w") as f:
+            f.write("<h1>Auction Dashboard</h1><p>Placeholder - create your dashboard.html</p>")
+        print(f"Created placeholder dashboard.html at: {dashboard_path}")
+    
+    templates = Jinja2Templates(directory=str(templates_path))
+    print(f"Templates initialized successfully with {len(os.listdir(templates_path))} files")
+    
+except Exception as e:
+    print(f"CRITICAL TEMPLATE ERROR: {str(e)}")
+    # Fallback to simple response
+    @app.get("/")
+    async def dashboard_fallback(request: Request):
+        return HTMLResponse("""
+        <h1>Auction Dashboard</h1>
+        <p>Template system failed to initialize. Check logs.</p>
+        <p>Path: {}</p>
+        <p>Error: {}</p>
+        """.format(templates_path, str(e)))
 # =====================================================
 # PHASE 1: MINIMAL FASTAPI SETUP (IMMEDIATE START)
 # =====================================================
@@ -190,3 +225,33 @@ if __name__ == "__main__":
     config = uvicorn.Config(app, host="0.0.0.0", port=PORT)
     server = uvicorn.Server(config)
     server.run()
+
+@app.get("/debug")
+async def debug_info(request: Request):
+    """Debug endpoint to verify file structure"""
+    try:
+        # List files in templates directory
+        template_files = os.listdir(templates_path) if templates_path.exists() else []
+        
+        # List files in root directory
+        root_files = os.listdir(pathlib.Path(__file__).parent)
+        
+        return HTMLResponse(f"""
+        <h1>Debug Information</h1>
+        <h2>Template Path: {templates_path}</h2>
+        <h3>Template Files ({len(template_files)}):</h3>
+        <ul>
+            {"".join(f"<li>{f}</li>" for f in template_files)}
+        </ul>
+        <h3>Root Directory Files ({len(root_files)}):</h3>
+        <ul>
+            {"".join(f"<li>{f}</li>" for f in root_files)}
+        </ul>
+        <h3>Environment Variables:</h3>
+        <ul>
+            <li>PORT: {os.getenv('PORT', '8000')}</li>
+            <li>DISCORD_TOKEN: {os.getenv('DISCORD_TOKEN', 'Not set')[:5]}...</li>
+        </ul>
+        """)
+    except Exception as e:
+        return HTMLResponse(f"<h1>Debug Error</h1><p>{str(e)}</p>")

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Start the bot in the background
+# Start Discord bot in background
 python bot.py &
 
-# Keep the script running
-wait
+# Start web server in foreground
+uvicorn bot:app --host 0.0.0.0 --port $PORT

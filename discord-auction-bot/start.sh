@@ -1,4 +1,7 @@
 #!/bin/bash
 
-# Start both services in the same Python process
+# Fix permissions for this script
+chmod +x "$0"
+
+# Start the application
 python bot.py

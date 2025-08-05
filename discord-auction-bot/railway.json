@@ -1,7 +1,7 @@
 {
   "build": {
     "builder": "nixpacks",
-    "nixpacksConfigPath": "discord-auction-bot/nixpacks.toml"
+    "nixpacksConfigPath": "nixpacks.toml"
   },
   "deploy": {
     "startCommand": "./start.sh",

@@ -1,3 +1,4 @@
+
 FROM python:3.11-slim
 
 # Install system dependencies
@@ -7,9 +8,17 @@ RUN apt-get update && \
 
 WORKDIR /app
 
+# Copy requirements first to cache dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy the rest of the application
 COPY . .
 
-CMD ["python", "bot.py"]  # Directly run the bot file
+# Make start.sh executable
+RUN chmod +x start.sh
+
+# Set environment variables
+ENV PORT=8000
+
+CMD ["./start.sh"]

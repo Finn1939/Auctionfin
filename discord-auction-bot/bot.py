@@ -342,3 +342,28 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+# Combined startup
+async def run_bot():
+    await bot.start(TOKEN)
+
+async def run_webserver():
+    config = uvicorn.Config(app, host="0.0.0.0", port=PORT)
+    server = uvicorn.Server(config)
+    await server.serve()
+
+if __name__ == "__main__":
+    # Create a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        # Run both services concurrently
+        loop.run_until_complete(asyncio.gather(
+            run_bot(),
+            run_webserver()
+        ))
+    except KeyboardInterrupt:
+        print("Shutting down...")
+    finally:
+        loop.close()

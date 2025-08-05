@@ -6,7 +6,8 @@
   "deploy": {
     "startCommand": "chmod +x start.sh && ./start.sh",
     "restartPolicyType": "always",
-    "restartPolicyMaxRetries": 10
+    "restartPolicyMaxRetries": 10,
+    "healthcheckPath": "/health"
   },
   "env": {
     "PORT": {

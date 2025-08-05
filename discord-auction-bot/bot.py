@@ -42,7 +42,7 @@ def save_auctions(auctions):
     with open(DB_FILE, 'w') as f:
         json.dump(auctions, f, indent=2)
 
-auctions_db = load_auctions())
+auctions_db = load_auctions()
 
 class AuctionCreationModal(Modal, title='Create Auction'):
     def __init__(self):

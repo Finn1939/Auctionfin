@@ -7,12 +7,22 @@ import os
 import json
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+# ... other imports ...
 from fastapi.templating import Jinja2Templates
 import uvicorn
 
 # Initialize FastAPI first
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+
+# Verify templates directory exists
+try:
+    os.listdir("templates")
+    templates = Jinja2Templates(directory="templates")
+except FileNotFoundError:
+    print("ERROR: templates directory not found!")
+    # Create it if missing in production?
+    os.makedirs("templates", exist_ok=True)
+    templates = Jinja2Templates(directory="templates")
 
 # Load environment variables
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -27,7 +37,7 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Database setup (keep your existing DB code)
+# Database setup
 DB_FILE = "auctions.json"
 bidders_role = "Bidders"
 
@@ -42,47 +52,8 @@ def save_auctions(auctions):
     with open(DB_FILE, 'w') as f:
         json.dump(auctions, f, indent=2)
 
+# CORRECTED LINE (removed extra parenthesis)
 auctions_db = load_auctions()
-
-class AuctionCreationModal(Modal, title='Create Auction'):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.item_title = TextInput(
-            label="Item/Service Title",
-            placeholder="What are you offering?",
-            max_length=100
-        )
-        self.item_description = TextInput(
-            label="Description",
-            style=discord.TextStyle.paragraph,
-            placeholder="Detailed description...",
-            required=False
-        )
-        self.add_item(self.item_title)
-        self.add_item(self.item_description)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        overwrites = {
-            interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            interaction.user: discord.PermissionOverwrite(read_messages=True),
-            discord.utils.get(interaction.guild.roles, name="Admin"): discord.PermissionOverwrite(read_messages=True)
-        }
-        
-        channel = await interaction.guild.create_text_channel(
-            name=f"auction-{self.item_title.value[:20]}",
-            overwrites=overwrites
-        )
-        
-        auctions_db[str(channel.id)] = {
-            "creator": interaction.user.id,
-            "title": self.item_title.value,
-            "description": self.item_description.value,
-            "status": "pending",
-            "bids": [],
-            "media": [],
-            "guild_id": interaction.guild.id
-        }
-        save_auctions(auctions_db)
         
         await interaction.response.send_message(
             f"Auction ticket created: {channel.mention}",

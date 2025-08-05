@@ -357,29 +357,33 @@ async def on_raw_reaction_add(payload):
 # FastAPI Routes
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request, "auctions": list(auctions_db.values())}
-    )
+    try:
+        return templates.TemplateResponse(
+            "dashboard.html",
+            {"request": request, "auctions": list(auctions_db.values())}
+        )
+    except Exception as e:
+        return HTMLResponse(f"<h1>Dashboard Error</h1><p>{str(e)}</p>", status_code=500)
 
 @app.get("/auctions")
 async def get_auctions():
     return JSONResponse(list(auctions_db.values()))
 
-# Combined startup
-async def run_bot():
-    await bot.start(TOKEN)
+# Improved startup with separate threads
+def run_bot():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(bot.start(TOKEN))
 
-async def run_webserver():
-    config = uvicorn.Config(app, host="0.0.0.0", port=PORT)
+def run_webserver():
+    config = uvicorn.Config(app, host="0.0.0.0", port=PORT, timeout_keep_alive=30)
     server = uvicorn.Server(config)
-    await server.serve()
-
-async def main():
-    await asyncio.gather(
-        run_bot(),
-        run_webserver()
-    )
+    asyncio.run(server.serve())
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Start bot in a separate thread
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+    
+    # Start web server in main thread
+    run_webserver()

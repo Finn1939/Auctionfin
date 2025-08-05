@@ -11,18 +11,28 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import uvicorn
+import threading
 
-# Ensure jinja2 is installed before importing templates
+# Ensure jinja2 is installed before anything else
 try:
     import jinja2
+    from fastapi.templating import Jinja2Templates
 except ImportError:
     print("Installing missing jinja2...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "jinja2==3.1.3"])
     import jinja2
+    from fastapi.templating import Jinja2Templates
 
 # Initialize FastAPI
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+
+# Try to create templates directory if missing
+try:
+    os.makedirs("templates", exist_ok=True)
+    templates = Jinja2Templates(directory="templates")
+except Exception as e:
+    print(f"Template error: {e}")
+    templates = Jinja2Templates(directory="")
 
 # Load environment variables
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -53,6 +63,11 @@ def save_auctions(auctions):
         json.dump(auctions, f, indent=2)
 
 auctions_db = load_auctions()
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "bot": "running" if bot.is_ready() else "starting"}
 
 class AuctionCreationModal(Modal, title='Create Auction'):
     def __init__(self):

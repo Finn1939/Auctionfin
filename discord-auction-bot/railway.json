@@ -1,18 +1,8 @@
 {
-  "build": {
-    "builder": "nixpacks",
-    "nixpacksConfigPath": "nixpacks.toml"
-  },
   "deploy": {
-    "startCommand": "chmod +x start.sh && ./start.sh",
+    "startCommand": "python bot.py",
     "restartPolicyType": "always",
-    "restartPolicyMaxRetries": 10,
-    "healthcheckPath": "/health"
-  },
-  "env": {
-    "PORT": {
-      "description": "Port for web server",
-      "value": "8000"
-    }
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 5
   }
 }

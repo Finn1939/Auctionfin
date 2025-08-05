@@ -4,7 +4,7 @@
     "nixpacksConfigPath": "nixpacks.toml"
   },
   "deploy": {
-    "startCommand": "./start.sh",
+    "startCommand": "bash start.sh",
     "restartPolicyType": "always",
     "restartPolicyMaxRetries": 10
   },

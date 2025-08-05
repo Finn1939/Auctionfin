@@ -7,22 +7,12 @@ import os
 import json
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-# ... other imports ...
 from fastapi.templating import Jinja2Templates
 import uvicorn
 
 # Initialize FastAPI first
 app = FastAPI()
-
-# Verify templates directory exists
-try:
-    os.listdir("templates")
-    templates = Jinja2Templates(directory="templates")
-except FileNotFoundError:
-    print("ERROR: templates directory not found!")
-    # Create it if missing in production?
-    os.makedirs("templates", exist_ok=True)
-    templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="templates")
 
 # Load environment variables
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -52,14 +42,56 @@ def save_auctions(auctions):
     with open(DB_FILE, 'w') as f:
         json.dump(auctions, f, indent=2)
 
-# CORRECTED LINE (removed extra parenthesis)
 auctions_db = load_auctions()
+
+class AuctionCreationModal(Modal, title='Create Auction'):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.item_title = TextInput(
+            label="Item/Service Title",
+            placeholder="What are you offering?",
+            max_length=100
+        )
+        self.item_description = TextInput(
+            label="Description",
+            style=discord.TextStyle.paragraph,
+            placeholder="Detailed description...",
+            required=False
+        )
+        self.add_item(self.item_title)
+        self.add_item(self.item_description)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        # Create auction ticket
+        overwrites = {
+            interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            interaction.user: discord.PermissionOverwrite(read_messages=True),
+            discord.utils.get(interaction.guild.roles, name="Admin"): discord.PermissionOverwrite(read_messages=True)
+        }
         
+        channel = await interaction.guild.create_text_channel(
+            name=f"auction-{self.item_title.value[:20]}",
+            overwrites=overwrites
+        )
+        
+        auctions_db[str(channel.id)] = {
+            "creator": interaction.user.id,
+            "title": self.item_title.value,
+            "description": self.item_description.value,
+            "status": "pending",
+            "bids": [],
+            "media": [],
+            "guild_id": interaction.guild.id
+        }
+        save_auctions(auctions_db)
+        
+        # Fixed indentation
         await interaction.response.send_message(
             f"Auction ticket created: {channel.mention}",
             ephemeral=True
         )
         
+        # Send initial auction message
         embed = discord.Embed(
             title=f"New Auction: {self.item_title.value}",
             description=self.item_description.value,
@@ -313,28 +345,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-# Combined startup
-async def run_bot():
-    await bot.start(TOKEN)
-
-async def run_webserver():
-    config = uvicorn.Config(app, host="0.0.0.0", port=PORT)
-    server = uvicorn.Server(config)
-    await server.serve()
-
-if __name__ == "__main__":
-    # Create a new event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    try:
-        # Run both services concurrently
-        loop.run_until_complete(asyncio.gather(
-            run_bot(),
-            run_webserver()
-        ))
-    except KeyboardInterrupt:
-        print("Shutting down...")
-    finally:
-        loop.close()

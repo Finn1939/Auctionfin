@@ -5,11 +5,14 @@ import asyncio
 from datetime import datetime, timedelta
 import os
 import json
-import aiohttp
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import uvicorn
+
+# Initialize FastAPI first
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
 # Load environment variables
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -18,15 +21,15 @@ PORT = int(os.getenv('PORT', 8000))
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN not set in environment variables")
 
+# Initialize Discord bot
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Database file path
+# Database setup (keep your existing DB code)
 DB_FILE = "auctions.json"
-bidders_role = "Bidders"  # Configurable role name
+bidders_role = "Bidders"
 
 def load_auctions():
     try:
@@ -39,7 +42,7 @@ def save_auctions(auctions):
     with open(DB_FILE, 'w') as f:
         json.dump(auctions, f, indent=2)
 
-auctions_db = load_auctions()
+auctions_db = load_auctions())
 
 class AuctionCreationModal(Modal, title='Create Auction'):
     def __init__(self):
@@ -310,10 +313,7 @@ async def on_raw_reaction_add(payload):
         save_auctions(auctions_db)
         await channel.send(f"💰 <@{payload.user_id}> placed a bid via reaction!")
 
-# Railway-optimized web server
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
-
+# FastAPI Routes
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     return templates.TemplateResponse(
@@ -325,13 +325,19 @@ async def dashboard(request: Request):
 async def get_auctions():
     return JSONResponse(list(auctions_db.values()))
 
+# Combined startup
 async def run_bot():
     await bot.start(TOKEN)
+
+async def run_webserver():
+    config = uvicorn.Config(app, host="0.0.0.0", port=PORT)
+    server = uvicorn.Server(config)
+    await server.serve()
 
 async def main():
     await asyncio.gather(
         run_bot(),
-        uvicorn.run(app, host="0.0.0.0", port=PORT)
+        run_webserver()
     )
 
 if __name__ == "__main__":

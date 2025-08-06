@@ -1,256 +1,331 @@
-import os
-import sys
-import json
-import time
-import asyncio
-import threading
-import pathlib
-from datetime import datetime, timedelta
-
-# MUST KEEP DISCORD IMPORT AT TOP
 import discord
 from discord.ext import commands
-from discord.ui import Button, View, Modal, TextInput
+import os
+import asyncio
+import aiohttp
+import time
+from dotenv import load_dotenv
+import logging
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-import uvicorn
-
-# ==================================================================
-# PHASE 0: INSTANT DEBUG ENDPOINT (TOP OF FILE)
-# ==================================================================
-app = FastAPI()
-start_time = time.time()
-
-@app.get("/debug")
-async def debug_info(request: Request):
-    """Top-level debug endpoint - available immediately"""
-    try:
-        # Get current working directory
-        cwd = pathlib.Path.cwd()
-        cwd_files = list(os.listdir(cwd))
-        
-        # Check templates directory
-        templates_path = cwd / "templates"
-        template_files = []
-        if templates_path.exists():
-            template_files = os.listdir(templates_path)
-        
-        # Check for dashboard.html
-        dashboard_exists = "dashboard.html" in template_files
-        
-        return HTMLResponse(f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Debug Information</title>
-            <style>
-                body {{ font-family: sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }}
-                .container {{ max-width: 1000px; margin: 0 auto; }}
-                .card {{ background: #1e1e1e; border-radius: 8px; padding: 20px; margin-bottom: 20px; }}
-                .status-ok {{ color: #00c853; }}
-                .status-error {{ color: #ff5252; }}
-                ul {{ list-style-type: none; padding: 0; }}
-                li {{ padding: 5px 0; border-bottom: 1px solid #333; }}
-                .path {{ font-family: monospace; background: #2d2d2d; padding: 2px 5px; border-radius: 4px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Auction Bot Debug Information</h1>
-                
-                <div class="card">
-                    <h2>System Status</h2>
-                    <ul>
-                        <li>Uptime: {int(time.time() - start_time)} seconds</li>
-                        <li>Python version: {sys.version}</li>
-                        <li>Working directory: <span class="path">{cwd}</span></li>
-                    </ul>
-                </div>
-                
-                <div class="card">
-                    <h2>Templates Directory</h2>
-                    <ul>
-                        <li>Path: <span class="path">{templates_path}</span></li>
-                        <li>Exists: <span class="{'status-ok' if templates_path.exists() else 'status-error'}">
-                            {templates_path.exists()}
-                        </span></li>
-                        <li>Dashboard.html found: <span class="{'status-ok' if dashboard_exists else 'status-error'}">
-                            {dashboard_exists}
-                        </span></li>
-                        <li>Files ({len(template_files)}):
-                            <ul>
-                                {"".join(f'<li class="path">{f}</li>' for f in template_files) or '<li>No files</li>'}
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-                
-                <div class="card">
-                    <h2>Root Directory Files</h2>
-                    <ul>
-                        {"".join(f'<li class="path">{f}</li>' for f in cwd_files) or '<li>No files</li>'}
-                    </ul>
-                </div>
-                
-                <div class="card">
-                    <h2>Environment Variables</h2>
-                    <ul>
-                        <li>PORT: {os.getenv('PORT', '8000 (default)')}</li>
-                        <li>DISCORD_TOKEN: {os.getenv('DISCORD_TOKEN', 'Not set')[:5] + '...' if os.getenv('DISCORD_TOKEN') else 'Not set'}</li>
-                        <li>RAILWAY_ENVIRONMENT: {os.getenv('RAILWAY_ENVIRONMENT', 'Not set')}</li>
-                    </ul>
-                </div>
-                
-                <div class="card">
-                    <h2>Next Steps</h2>
-                    <ol>
-                        <li>Verify "templates" directory exists in root</li>
-                        <li>Ensure "dashboard.html" is inside templates</li>
-                        <li>Check file names are exact (case-sensitive)</li>
-                        <li>Redeploy if files are missing</li>
-                    </ol>
-                </div>
-            </div>
-        </body>
-        </html>
-        """)
-    except Exception as e:
-        return HTMLResponse(f"<h1>Debug Error</h1><p>{str(e)}</p>")
-
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return PlainTextResponse("ok")
-
-# ==================================================================
-# REST OF YOUR APPLICATION
-# ==================================================================
 # Load environment variables
+load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
-PORT = int(os.getenv('PORT', 8000))
+GUILD_ID = int(os.getenv('GUILD_ID'))
+API_URL = os.getenv('API_URL', 'http://localhost:5000')
+CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 
-if not TOKEN:
-    print("WARNING: DISCORD_TOKEN not set. Bot will not start")
-    bot = None
-else:
-    # Initialize Discord bot
-    intents = discord.Intents.default()
-    intents.message_content = True
-    intents.members = True
-    bot = commands.Bot(command_prefix='!', intents=intents)
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('discord_bot')
 
-# Database setup
-DB_FILE = "auctions.json"
-bidders_role = "Bidders"
+# Define intents
+intents = discord.Intents.default()
+intents.messages = True
+intents.message_content = True
+intents.guilds = True
+intents.members = True
 
-def load_auctions():
-    try:
-        with open(DB_FILE, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+bot = commands.Bot(command_prefix='!', intents=intents)
 
-def save_auctions(auctions):
-    with open(DB_FILE, 'w') as f:
-        json.dump(auctions, f, indent=2)
+# Top-level event handler
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user}')
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="auctions"))
 
-auctions_db = load_auctions()
+class AuctionCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.auction_channel_id = CHANNEL_ID
+        self.guild_id = GUILD_ID
+        self.api_url = API_URL
+        self.session = aiohttp.ClientSession()
+        self.active_auctions = {}
+        self.bid_tasks = {}
 
-# Initialize templates
-try:
-    templates = Jinja2Templates(directory="templates")
-    print("Templates initialized successfully")
-except Exception as e:
-    print(f"Template initialization error: {e}")
-    # Fallback template system
-    templates = None
+    async def get_user_balance(self, user_id):
+        try:
+            async with self.session.get(f"{self.api_url}/balance/{user_id}") as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('balance', 0)
+                else:
+                    logger.error(f"Failed to get balance for user {user_id}: {response.status}")
+                    return 0
+        except Exception as e:
+            logger.error(f"Error getting balance: {str(e)}")
+            return 0
 
-# ==================================================================
-# DISCORD BOT FUNCTIONALITY
-# ==================================================================
-if bot:
-    class AuctionCreationModal(Modal, title='Create Auction'):
-        def __init__(self):
-            super().__init__(timeout=None)
-            self.item_title = TextInput(
-                label="Item/Service Title",
-                placeholder="What are you offering?",
-                max_length=100
-            )
-            self.item_description = TextInput(
-                label="Description",
-                style=discord.TextStyle.paragraph,
-                placeholder="Detailed description...",
-                required=False
-            )
-            self.add_item(self.item_title)
-            self.add_item(self.item_description)
+    async def update_user_balance(self, user_id, amount):
+        try:
+            async with self.session.post(f"{self.api_url}/update_balance", json={"user_id": user_id, "amount": amount}) as response:
+                return response.status == 200
+        except Exception as e:
+            logger.error(f"Error updating balance: {str(e)}")
+            return False
 
-        async def on_submit(self, interaction: discord.Interaction):
-            # [KEEP YOUR EXISTING CODE HERE - NO CHANGES]
-            # ... (your existing auction creation logic) ...
+    async def record_transaction(self, user_id, amount, transaction_type, description):
+        try:
+            async with self.session.post(f"{self.api_url}/record_transaction", json={
+                "user_id": user_id,
+                "amount": amount,
+                "type": transaction_type,
+                "description": description
+            }) as response:
+                return response.status == 200
+        except Exception as e:
+            logger.error(f"Error recording transaction: {str(e)}")
+            return False
 
-    @bot.event
-    async def on_ready():
-        print(f'Logged in as {bot.user} (ID: {bot.user.id})')
-        await bot.change_presence(activity=discord.Activity(
-            type=discord.ActivityType.watching,
-            name="Auctions"
-        ))
-        bot.add_view(AuctionView())
+    async def get_auction_data(self):
+        try:
+            async with self.session.get(f"{self.api_url}/auctions") as response:
+                if response.status == 200:
+                    return await response.json()
+                return []
+        except Exception as e:
+            logger.error(f"Error fetching auctions: {str(e)}")
+            return []
 
-    class AuctionView(View):
-        def __init__(self):
-            super().__init__(timeout=None)
+    async def create_auction(self, item, start_price, duration_minutes, image_url=None):
+        try:
+            async with self.session.post(f"{self.api_url}/create_auction", json={
+                "item": item,
+                "start_price": start_price,
+                "duration_minutes": duration_minutes,
+                "image_url": image_url
+            }) as response:
+                if response.status == 201:
+                    return await response.json()
+                return None
+        except Exception as e:
+            logger.error(f"Error creating auction: {str(e)}")
+            return None
+
+    async def place_bid(self, auction_id, user_id, amount):
+        try:
+            async with self.session.post(f"{self.api_url}/place_bid", json={
+                "auction_id": auction_id,
+                "user_id": user_id,
+                "amount": amount
+            }) as response:
+                return response.status == 200
+        except Exception as e:
+            logger.error(f"Error placing bid: {str(e)}")
+            return False
+
+    async def get_auction_details(self, auction_id):
+        try:
+            async with self.session.get(f"{self.api_url}/auction/{auction_id}") as response:
+                if response.status == 200:
+                    return await response.json()
+                return None
+        except Exception as e:
+            logger.error(f"Error getting auction details: {str(e)}")
+            return None
+
+    async def end_auction(self, auction_id):
+        try:
+            async with self.session.post(f"{self.api_url}/end_auction/{auction_id}") as response:
+                return response.status == 200
+        except Exception as e:
+            logger.error(f"Error ending auction: {str(e)}")
+            return False
+
+    async def auction_countdown(self, auction_id, duration):
+        await asyncio.sleep(duration * 60)
+        auction = await self.get_auction_details(auction_id)
+        if auction and auction['status'] == 'active':
+            await self.end_auction(auction_id)
+            auction = await self.get_auction_details(auction_id)
+            channel = self.bot.get_channel(self.auction_channel_id)
+            if auction['highest_bidder']:
+                winner = self.bot.get_user(int(auction['highest_bidder']))
+                winner_message = f"🎉 Congratulations {winner.mention}! You won the auction for **{auction['item']}** with a bid of **${auction['current_price']}**!"
+                
+                # Create embed
+                embed = discord.Embed(
+                    title=f"Auction Ended: {auction['item']}",
+                    description=f"Winner: {winner.mention}\nWinning Bid: ${auction['current_price']}",
+                    color=discord.Color.green()
+                )
+                if auction.get('image_url'):
+                    embed.set_image(url=auction['image_url'])
+                
+                await channel.send(winner_message, embed=embed)
+                
+                # Deduct balance from winner
+                await self.update_user_balance(str(winner.id), -auction['current_price'])
+                await self.record_transaction(
+                    str(winner.id),
+                    -auction['current_price'],
+                    'debit',
+                    f"Won auction for {auction['item']}"
+                )
+            else:
+                await channel.send(f"⚠️ Auction for **{auction['item']}** ended with no bids.")
+            del self.active_auctions[auction_id]
+            if auction_id in self.bid_tasks:
+                self.bid_tasks[auction_id].cancel()
+                del self.bid_tasks[auction_id]
+
+    @commands.command(name='startauction', help='Start a new auction! Usage: !startauction "Item Name" start_price duration_minutes [image_url]')
+    @commands.has_role('Auction Manager')
+    async def start_auction(self, ctx, item: str, start_price: float, duration_minutes: int, image_url: str = None):
+        if duration_minutes <= 0:
+            await ctx.send("Duration must be greater than 0 minutes.")
+            return
+
+        auction = await self.create_auction(item, start_price, duration_minutes, image_url)
+        if auction:
+            channel = self.bot.get_channel(self.auction_channel_id)
             
-        @discord.ui.button(
-            label="Create Auction", 
-            style=discord.ButtonStyle.primary,
-            custom_id="create_auction"
-        )
-        async def create_auction(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await interaction.response.send_modal(AuctionCreationModal())
+            # Create embed
+            embed = discord.Embed(
+                title=f"New Auction: {item}",
+                description=f"Starting Price: **${start_price}**\nDuration: **{duration_minutes} minutes**",
+                color=discord.Color.blue()
+            )
+            if image_url:
+                embed.set_image(url=image_url)
+            
+            message = await channel.send(
+                f"🚨 New auction started! 🚨\n"
+                f"Item: **{item}**\n"
+                f"Starting price: **${start_price}**\n"
+                f"Auction ends in {duration_minutes} minutes!\n"
+                f"Type `!bid {auction['id']} <amount>` to place a bid!",
+                embed=embed
+            )
+            
+            # Store auction info with correct syntax
+            self.active_auctions[auction['id']] = {
+                'message_id': message.id,
+                'end_time': time.time() + duration_minutes * 60
+            }
+            self.bid_tasks[auction['id']] = asyncio.create_task(self.auction_countdown(auction['id'], duration_minutes))
+            await ctx.send(f"Auction started successfully! Check <#{self.auction_channel_id}>")
+        else:
+            await ctx.send("Failed to start auction. Please try again.")
 
-    # ... [KEEP ALL YOUR OTHER COMMANDS AND EVENTS HERE] ...
-
-# ==================================================================
-# DASHBOARD ROUTES
-# ==================================================================
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    try:
-        if not templates:
-            return HTMLResponse("<h1>Configuration Error</h1><p>Templates not initialized</p>")
+    @commands.command(name='bid', help='Place a bid on an auction! Usage: !bid auction_id amount')
+    async def place_bid_command(self, ctx, auction_id: int, amount: float):
+        user_id = str(ctx.author.id)
+        auction = await self.get_auction_details(auction_id)
         
-        return templates.TemplateResponse(
-            "dashboard.html",
-            {"request": request, "auctions": list(auctions_db.values())}
-        )
-    except Exception as e:
-        return HTMLResponse(f"<h1>Dashboard Error</h1><p>{str(e)}</p>")
+        if not auction:
+            await ctx.send("Auction not found.")
+            return
+        
+        if auction['status'] != 'active':
+            await ctx.send("This auction is no longer active.")
+            return
+        
+        if amount <= auction['current_price']:
+            await ctx.send(f"Your bid must be higher than the current price of ${auction['current_price']}.")
+            return
+        
+        balance = await self.get_user_balance(user_id)
+        if balance < amount:
+            await ctx.send(f"You don't have enough funds. Your balance is ${balance}.")
+            return
+        
+        if await self.place_bid(auction_id, user_id, amount):
+            # Update auction details
+            auction['current_price'] = amount
+            auction['highest_bidder'] = user_id
+            
+            channel = self.bot.get_channel(self.auction_channel_id)
+            try:
+                message = await channel.fetch_message(self.active_auctions[auction_id]['message_id'])
+                
+                # Update embed
+                embed = message.embeds[0] if message.embeds else discord.Embed()
+                embed.description = (
+                    f"Current Price: **${amount}**\n"
+                    f"Highest Bidder: <@{user_id}>\n"
+                    f"Time Remaining: **{int((self.active_auctions[auction_id]['end_time'] - time.time()) // 60)} minutes**"
+                )
+                
+                await message.edit(content=f"🚨 New bid placed! Current price for **{auction['item']}**: **${amount}** by <@{user_id}>", embed=embed)
+            except Exception as e:
+                logger.error(f"Error updating auction message: {str(e)}")
+            
+            await ctx.send(f"✅ Bid of **${amount}** placed successfully for **{auction['item']}**!")
+        else:
+            await ctx.send("Failed to place bid. Please try again.")
 
-@app.get("/auctions")
-async def get_auctions():
-    return JSONResponse(list(auctions_db.values()))
+    @commands.command(name='balance', help='Check your balance')
+    async def check_balance(self, ctx):
+        balance = await self.get_user_balance(str(ctx.author.id))
+        await ctx.send(f"Your current balance is **${balance}**")
 
-# ==================================================================
-# STARTUP SEQUENCE
-# ==================================================================
-def start_bot():
-    """Start Discord bot in a background thread"""
-    if TOKEN and bot:
-        print("Starting Discord bot...")
-        bot.run(TOKEN)
+    @commands.command(name='addfunds', help='Add funds to your account')
+    async def add_funds(self, ctx, amount: float):
+        if amount <= 0:
+            await ctx.send("Amount must be positive.")
+            return
+        
+        if await self.update_user_balance(str(ctx.author.id), amount):
+            await self.record_transaction(
+                str(ctx.author.id),
+                amount,
+                'credit',
+                "Added funds"
+            )
+            await ctx.send(f"✅ **${amount}** added to your account!")
+        else:
+            await ctx.send("Failed to add funds. Please try again.")
 
+    @commands.command(name='active', help='List active auctions')
+    async def list_active_auctions(self, ctx):
+        auctions = await self.get_auction_data()
+        active_auctions = [a for a in auctions if a['status'] == 'active']
+        
+        if not active_auctions:
+            await ctx.send("No active auctions currently.")
+            return
+        
+        embed = discord.Embed(title="Active Auctions", color=discord.Color.blue())
+        for auction in active_auctions:
+            time_left = int((self.active_auctions[auction['id']]['end_time'] - time.time()) // 60)
+            embed.add_field(
+                name=f"Auction #{auction['id']}: {auction['item']}",
+                value=(
+                    f"Current Price: ${auction['current_price']}\n"
+                    f"Highest Bidder: <@{auction['highest_bidder']}>\n"
+                    f"Time Left: {time_left} minutes\n"
+                    f"Bid with `!bid {auction['id']} <amount>`"
+                ),
+                inline=False
+            )
+        await ctx.send(embed=embed)
+
+    @commands.command(name='forceend', help='Force end an auction')
+    @commands.has_role('Auction Manager')
+    async def force_end_auction(self, ctx, auction_id: int):
+        if await self.end_auction(auction_id):
+            if auction_id in self.bid_tasks:
+                self.bid_tasks[auction_id].cancel()
+                del self.bid_tasks[auction_id]
+            await ctx.send(f"Auction #{auction_id} ended successfully.")
+        else:
+            await ctx.send("Failed to end auction.")
+
+    @commands.command(name='helpauction', help='Show auction commands')
+    async def auction_help(self, ctx):
+        embed = discord.Embed(title="Auction Bot Commands", color=discord.Color.blue())
+        embed.add_field(name="!startauction", value="Start a new auction (Auction Managers only)", inline=False)
+        embed.add_field(name="!bid <auction_id> <amount>", value="Place a bid on an auction", inline=False)
+        embed.add_field(name="!balance", value="Check your balance", inline=False)
+        embed.add_field(name="!addfunds <amount>", value="Add funds to your account", inline=False)
+        embed.add_field(name="!active", value="List active auctions", inline=False)
+        embed.add_field(name="!helpauction", value="Show this help message", inline=False)
+        await ctx.send(embed=embed)
+
+async def setup(bot):
+    await bot.add_cog(AuctionCog(bot))
+
+# Run the bot
 if __name__ == "__main__":
-    # Start Discord bot in background thread
-    bot_thread = threading.Thread(target=start_bot, daemon=True)
-    bot_thread.start()
-    
-    # Start web server in main thread
-    print(f"Starting web server on port {PORT}")
-    config = uvicorn.Config(app, host="0.0.0.0", port=PORT)
-    server = uvicorn.Server(config)
-    server.run()
+    bot.run(TOKEN)

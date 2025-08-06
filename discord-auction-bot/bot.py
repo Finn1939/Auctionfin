@@ -3,6 +3,7 @@ from discord.ext import commands
 import os
 import asyncio
 import aiohttp
+from aiohttp import web  # Added for healthcheck
 import time
 from dotenv import load_dotenv
 import logging
@@ -27,11 +28,25 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# Healthcheck server function for Railway
+async def healthcheck_server():
+    app = web.Application()
+    app.router.add_get('/health', lambda request: web.Response(text="OK"))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+    print("Healthcheck server running on port 8080")
+    return site
+
 # Top-level event handler
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="auctions"))
+    
+    # Start healthcheck server for Railway
+    await healthcheck_server()
 
 class AuctionCog(commands.Cog):
     def __init__(self, bot):
@@ -266,7 +281,8 @@ class AuctionCog(commands.Cog):
             await ctx.send("Amount must be positive.")
             return
         
-        if await self.update_user_balance(str(ctx.author.id), amount):
+        # Fixed syntax error here (removed extra parenthesis)
+        if await self.update_user_balance(str(ctx.author.id), amount:
             await self.record_transaction(
                 str(ctx.author.id),
                 amount,

@@ -1,7 +1,0 @@
-.env
-__pycache__/
-*.pyc
-*.log
-venv/
-.DS_Store
-auctions.json
